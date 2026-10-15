@@ -4,7 +4,7 @@ from nicegui import app as nicegui_app
 from app.gui import baue_heldenbogen
 
 
-nicegui_app.add_static_files("/Fonts", Path(__file__).parent / "Fonts")
+nicegui_app.add_static_files("/fonts", Path(__file__).parent / "Fonts")
 
 @ui.page("/")
 def index() -> None:

@@ -1,7 +1,7 @@
 """gui"""
 from __future__ import annotations
 from nicegui import ui
-from .modell import Held, beispiel_held, EIGENSCHAFTEN, GRUNDWERTE
+from .modell import Held, beispiel_held, EIGENSCHAFTEN, GRUNDWERTE, Energie, ENERGIEN
 
 HINTERGRUND = "#14161b"
 KARTE = "#1d2027"
@@ -11,8 +11,20 @@ NEBENTEXT = "#a9adb6"
 AKZENT = "#e8b04a"
 
 EIGENSCHAFT_FARBEN = {
-    "MU": "#c0392b", "KL": "#8e44ad", "IN": "#27ae60", "CH": "#7f8c8d",
-    "FF": "#d4b106", "GE": "#2e5fd1", "KO": "#9aa0a8", "KK": "#e67e22",
+    "MU": "#c0392b", 
+    "KL": "#8e44ad", 
+    "IN": "#27ae60", 
+    "CH": "#7f8c8d",
+    "FF": "#d4b106", 
+    "GE": "#2e5fd1", 
+    "KO": "#9aa0a8", 
+    "KK": "#e67e22"
+}
+
+ENERGIE_FARBEN = {
+    "LeP": "#d4453a", 
+    "AsP": "#5b8fe0", 
+    "KaP": "#d1a85a"
 }
 
 BUTTON_HOEHE = "44px"
@@ -45,6 +57,9 @@ def _theme() -> None:
         .q-btn {{ min-height:{BUTTON_HOEHE}; border-radius:{RUNDUNG} !important; }}
         .pm-knopf {{ background:#2a2e37 !important; border:1px solid #3a3f4a;
                      min-width:40px; font-size:18px; }}
+
+        /* --- Eingabefelder --- */
+        .q-field--outlined .q-field__control {{ border-radius:{RUNDUNG}; }}
     """)
 
 # Areas
@@ -91,6 +106,49 @@ def _grundwerte(held: Held) -> None:
                 ui.label(anzeigename).classes("text-sm").style("color:#c9c6bf")
                 _plus_minus(held.grundwerte, kurz, schriftgroesse="22px")
 
+def _energie_karte(energie: Energie, name: str, farbe: str) -> None:
+    """ilfsfunktion energie object"""
+    eingabe = {"plus": None, "minus": None}
+
+    def bestaetigen() -> None:
+        plus = int(eingabe["plus"] or 0)
+        minus = int(eingabe["minus"] or 0)
+        energie.confirm(plus, minus)
+        eingabe["plus"] = None
+        eingabe["minus"] = None
+
+    with ui.column().classes("karte w-full gap-3"):
+        with ui.row().classes("w-full items-center justify-between"):
+            ui.label(name).classes("text-base font-medium")
+            with ui.row().classes("zahl items-center gap-2 no-wrap"):
+                ui.label().bind_text_from(energie, "aktuell", backward=str).style("font-size:26px")
+                ui.label("/").style(f"color:{NEBENTEXT}; font-size:18px")
+                ui.button("−", on_click=lambda: energie.max_change(-1)) \
+                    .props("flat dense color=white").classes("pm-knopf")
+                ui.label().bind_text_from(energie, "max", backward=str) \
+                    .classes("text-center").style("font-size:20px; min-width:28px")
+                ui.button("+", on_click=lambda: energie.max_change(+1)) \
+                    .props("flat dense color=white").classes("pm-knopf")
+                ui.label("max").style(f"color:{NEBENTEXT}; font-size:12px")
+
+        ui.linear_progress(show_value=False, size="16px", color=farbe) \
+            .bind_value_from(energie, "anteil")
+
+        with ui.row().classes("items-center gap-3"):
+            ui.label("+").classes("zahl text-lg").style("color:#9fe0b5")
+            ui.number(min=0, format="%d").bind_value(eingabe, "plus") \
+                .props("outlined dense dark").classes("w-24")
+            ui.label("−").classes("zahl text-lg").style("color:#ffb3a8")
+            ui.number(min=0, format="%d").bind_value(eingabe, "minus") \
+                .props("outlined dense dark").classes("w-24")
+            ui.button("Bestätigen", on_click=bestaetigen) \
+                .props("unelevated no-caps text-color=black")
+
+
+def _energien(held: Held) -> None:
+    with ui.column().classes("w-full gap-3"):
+        for kurz, name in ENERGIEN.items():
+            _energie_karte(held.energien[kurz], name, ENERGIE_FARBEN[kurz])
 
 # Build example
 def baue_heldenbogen() -> None:
@@ -100,3 +158,4 @@ def baue_heldenbogen() -> None:
         _kopfzeile(held)
         _eigenschaften(held)
         _grundwerte(held)
+        _energien(held)
