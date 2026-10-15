@@ -3,6 +3,19 @@ from __future__ import annotations
 from nicegui import ui
 from .modell import Held, beispiel_held, EIGENSCHAFTEN, GRUNDWERTE, Energie, ENERGIEN, ZUSTAENDE, STATUS, MAX_ZUSTANDSSTUFE, Fernkampfwaffe, Nahkampfwaffe, Ruestung, KAMPFTECHNIKEN, Eintrag
 from collections.abc import Callable
+from pathlib import Path
+from nicegui import app as nicegui_app
+from . import speicher
+
+# für laden alte und neue versionen
+try:
+    from webview import FileDialog
+    DIALOG_OEFFNEN, DIALOG_SPEICHERN = FileDialog.OPEN, FileDialog.SAVE
+except ImportError:
+    import webview
+    DIALOG_OEFFNEN, DIALOG_SPEICHERN = webview.OPEN_DIALOG, webview.SAVE_DIALOG
+
+DATEITYPEN = ("JSON Dateien (*.json)", "Alle Dateien (*.*)")
 
 HINTERGRUND = "#14161b"
 KARTE = "#1d2027"
@@ -103,17 +116,56 @@ EINTRAG_SPALTEN = [
 
 KT_RASTER = "1fr 64px 36px auto 56px 56px"
 
+# Dateien
+def _erster_pfad(ergebnis) -> str | None:
+    """pywebview je nach System String / Tupel / None"""
+    if not ergebnis:
+        return None
+    if isinstance(ergebnis, (list, tuple)):
+        return ergebnis[0]
+    return ergebnis
+
+
+async def _datei_oeffnen() -> str | None:
+    fenster = nicegui_app.native.main_window
+    if fenster is None:
+        ui.notify("Datei Diag nur im Fenster", type="warning")
+        return None
+    ergebnis = await fenster.create_file_dialog(DIALOG_OEFFNEN, allow_multiple=False, file_types=DATEITYPEN)
+    return _erster_pfad(ergebnis)
+
+
+async def _datei_speichern(vorschlag: str) -> str | None:
+    fenster = nicegui_app.native.main_window
+    if fenster is None:
+        ui.notify("Datei Diag nur im Fenster", type="warning")
+        return None
+    ergebnis = await fenster.create_file_dialog(DIALOG_SPEICHERN, save_filename=vorschlag, file_types=DATEITYPEN)
+    pfad = _erster_pfad(ergebnis)
+    if pfad and not pfad.lower().endswith(".json"):
+        pfad += ".json"
+    return pfad
+
+
+def _dateiname(name: str) -> str:
+    """Heldenname = Dateiname"""
+    sicher = "".join(z for z in name if z.isalnum() or z in " -_").strip()
+    return f"{sicher or 'held'}.json"
+
 # Areas
-def _kopfzeile(held: Held) -> None:
+def _kopfzeile(held: Held, beim_laden: Callable, beim_exportieren: Callable) -> None:
     with ui.row().classes("w-full items-center justify-between pb-4") \
             .style(f"border-bottom:1px solid {LINIE}"):
         with ui.row().classes("items-baseline gap-4"):
             ui.label(held.name).style(f"font-size:30px; color:{AKZENT}")
             ui.label(f"{held.profession} · {held.spezies}").style(f"color:{NEBENTEXT}")
         with ui.row().classes("gap-2"):
-            ui.button("Optolith-JSON laden").props("outline no-caps color=white")
-            ui.button("Stand laden").props("outline no-caps color=white")
-            ui.button("Stand als JSON exportieren").props("unelevated no-caps text-color=black")
+            ui.button("Optolith-JSON laden", on_click=lambda: ui.notify("Kommt im nächsten Schritt.")) \
+                .props("outline no-caps color=white")
+            ui.button("Stand laden", on_click=beim_laden) \
+                .props("outline no-caps color=white")
+            ui.button("Stand als JSON exportieren", on_click=beim_exportieren) \
+                .props("unelevated no-caps text-color=black")
 
 def _ueberschrift(text: str) -> None:
     """Goldene Bereichsüberschrift (Schmerz, Zustände, Status …)."""
@@ -393,28 +445,61 @@ def _notizen(held: Held) -> None:
 
 # Build example
 def baue_heldenbogen() -> None:
-    held = beispiel_held()
     _theme()
-    with ui.column().classes("w-full max-w-[1376px] mx-auto gap-5 p-6"):
-        _kopfzeile(held)
-        _eigenschaften(held)
-        _grundwerte(held)
+    stand = {"held": beispiel_held()}
 
-        with ui.row().classes("w-full gap-5 items-start no-wrap"):
-            with ui.column().style("flex:2 1 0; min-width:0"):
-                _energien(held, nach_aenderung=_schmerz.refresh)
-                _schicksalspunkte(held)
-            with ui.column().style("flex:1 1 0; min-width:0"):
-                _schmerz(held)
+    def held_ersetzen(neuer: Held) -> None:
+        stand["held"] = neuer
+        bogen.refresh()
 
-        _ausruestung(held)
+    async def stand_laden() -> None:
+        pfad = await _datei_oeffnen()
+        if pfad is None:
+            return
+        try:
+            neuer = speicher.laden(pfad)
+        except speicher.SaveFail as e:
+            ui.notify(str(e), type="negative", multi_line=True)
+            return
+        held_ersetzen(neuer)
+        ui.notify(f"„{neuer.name}“ geladen.", type="positive")
 
-        _kampftechniken(held)
+    async def stand_exportieren() -> None:
+        held = stand["held"]
+        pfad = await _datei_speichern(_dateiname(held.name))
+        if pfad is None:
+            return
+        try:
+            speicher.exportieren(held, pfad)
+        except OSError as e:
+            ui.notify(f"Speichern fehlgeschlagen: {e}", type="negative", multi_line=True)
+            return
+        ui.notify(f"Gespeichert als {Path(pfad).name}", type="positive")
 
-        _notizen(held)
+    @ui.refreshable
+    def bogen() -> None:
+        held = stand["held"]
+        with ui.column().classes("w-full max-w-[1376px] mx-auto gap-5 p-6"):
+            _kopfzeile(held, beim_laden=stand_laden, beim_exportieren=stand_exportieren)
+            _eigenschaften(held)
+            _grundwerte(held)
 
-        with ui.row().classes("w-full gap-5 items-start no-wrap"):
-            with ui.column().style("flex:1 1 0; min-width:0"):
-                _zustaende(held)
-            with ui.column().style("flex:1 1 0; min-width:0"):
-                _status(held)
+            with ui.row().classes("w-full gap-5 items-start no-wrap"):
+                with ui.column().style("flex:2 1 0; min-width:0"):
+                    _energien(held, nach_aenderung=_schmerz.refresh)
+                    _schicksalspunkte(held)
+                with ui.column().style("flex:1 1 0; min-width:0"):
+                    _schmerz(held)
+
+            _kampftechniken(held)
+            _ausruestung(held)
+
+            with ui.row().classes("w-full gap-5 items-start no-wrap"):
+                with ui.column().style("flex:1 1 0; min-width:0"):
+                    _zustaende(held)
+                with ui.column().style("flex:1 1 0; min-width:0"):
+                    _status(held)
+
+            _notizen(held)
+
+    bogen()
