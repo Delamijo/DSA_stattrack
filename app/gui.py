@@ -1,7 +1,8 @@
 """gui"""
 from __future__ import annotations
 from nicegui import ui
-from .modell import Held, beispiel_held, EIGENSCHAFTEN, GRUNDWERTE, Energie, ENERGIEN
+from .modell import Held, beispiel_held, EIGENSCHAFTEN, GRUNDWERTE, Energie, ENERGIEN, ZUSTAENDE, STATUS, MAX_ZUSTANDSSTUFE
+from collections.abc import Callable
 
 HINTERGRUND = "#14161b"
 KARTE = "#1d2027"
@@ -26,6 +27,8 @@ ENERGIE_FARBEN = {
     "AsP": "#5b8fe0", 
     "KaP": "#d1a85a"
 }
+
+SCHMERZ_MARKIERUNG = "#3b2a12"
 
 BUTTON_HOEHE = "44px"
 RUNDUNG = "2px"
@@ -62,6 +65,15 @@ def _theme() -> None:
         .q-field--outlined .q-field__control {{ border-radius:{RUNDUNG}; }}
     """)
 
+SCHMERZ_TEXTE = [
+    "¼ verloren · Schmerz +1",
+    "½ verloren · Schmerz +1",
+    "¾ verloren · Schmerz +1",
+    "5 oder weniger · Schmerz +1",
+    "0 oder weniger · im Sterben",
+]
+ROEMISCH = ["I", "II", "III", "IV"]
+
 # Areas
 def _kopfzeile(held: Held) -> None:
     with ui.row().classes("w-full items-center justify-between pb-4") \
@@ -73,6 +85,10 @@ def _kopfzeile(held: Held) -> None:
             ui.button("Optolith-JSON laden").props("outline no-caps color=white")
             ui.button("Stand laden").props("outline no-caps color=white")
             ui.button("Stand als JSON exportieren").props("unelevated no-caps text-color=black")
+
+def _ueberschrift(text: str) -> None:
+    """Goldene Bereichsüberschrift (Schmerz, Zustände, Status …)."""
+    ui.label(text).classes("font-medium").style(f"font-size:20px; color:{AKZENT}")
 
 def _plus_minus(werte: dict, schluessel: str, minimum: int | None = None, schriftgroesse: str = "28px") -> None:
     """+ - für Erigenschaft und Grund"""
@@ -106,8 +122,8 @@ def _grundwerte(held: Held) -> None:
                 ui.label(anzeigename).classes("text-sm").style("color:#c9c6bf")
                 _plus_minus(held.grundwerte, kurz, schriftgroesse="22px")
 
-def _energie_karte(energie: Energie, name: str, farbe: str) -> None:
-    """ilfsfunktion energie object"""
+def _energie_karte(energie: Energie, name: str, farbe: str, nach_aenderung: Callable[[], None]) -> None:
+    """Eine Karte: Kopf mit aktuell / max, Balken, Eingabe + / − und Bestätigen."""
     eingabe = {"plus": None, "minus": None}
 
     def bestaetigen() -> None:
@@ -116,6 +132,11 @@ def _energie_karte(energie: Energie, name: str, farbe: str) -> None:
         energie.confirm(plus, minus)
         eingabe["plus"] = None
         eingabe["minus"] = None
+        nach_aenderung()
+
+    def max_aendern(delta: int) -> None:
+        energie.max_change(delta)
+        nach_aenderung()
 
     with ui.column().classes("karte w-full gap-3"):
         with ui.row().classes("w-full items-center justify-between"):
@@ -123,11 +144,11 @@ def _energie_karte(energie: Energie, name: str, farbe: str) -> None:
             with ui.row().classes("zahl items-center gap-2 no-wrap"):
                 ui.label().bind_text_from(energie, "aktuell", backward=str).style("font-size:26px")
                 ui.label("/").style(f"color:{NEBENTEXT}; font-size:18px")
-                ui.button("−", on_click=lambda: energie.max_change(-1)) \
+                ui.button("−", on_click=lambda: max_aendern(-1)) \
                     .props("flat dense color=white").classes("pm-knopf")
                 ui.label().bind_text_from(energie, "max", backward=str) \
                     .classes("text-center").style("font-size:20px; min-width:28px")
-                ui.button("+", on_click=lambda: energie.max_change(+1)) \
+                ui.button("+", on_click=lambda: max_aendern(+1)) \
                     .props("flat dense color=white").classes("pm-knopf")
                 ui.label("max").style(f"color:{NEBENTEXT}; font-size:12px")
 
@@ -145,10 +166,68 @@ def _energie_karte(energie: Energie, name: str, farbe: str) -> None:
                 .props("unelevated no-caps text-color=black")
 
 
-def _energien(held: Held) -> None:
+def _energien(held: Held, nach_aenderung: Callable[[], None]) -> None:
     with ui.column().classes("w-full gap-3"):
         for kurz, name in ENERGIEN.items():
-            _energie_karte(held.energien[kurz], name, ENERGIE_FARBEN[kurz])
+            _energie_karte(held.energien[kurz], name, ENERGIE_FARBEN[kurz], nach_aenderung)
+
+@ui.refreshable
+def _schmerz(held: Held) -> None:
+    lep = held.energien["LeP"]
+    schwellen = held.schmerzschwellen()
+
+    with ui.column().classes("karte w-full gap-1"):
+        _ueberschrift("Schmerz")
+        ui.label(f"Schwellen aus max. LeP ({lep.max}). Erreichte Schwellen markiert") \
+            .classes("text-xs pb-2").style(f"color:{NEBENTEXT}")
+        for i, (schwelle, text) in enumerate(zip(schwellen, SCHMERZ_TEXTE)):
+            _schmerz_zeile(held, i, schwelle, text, erreicht=lep.aktuell <= schwelle)
+
+
+def _schmerz_zeile(held: Held, i: int, schwelle: int, text: str, erreicht: bool) -> None:
+    hintergrund = SCHMERZ_MARKIERUNG if erreicht else "transparent"
+
+    def umschalten(e) -> None:
+        held.schmerz_angekreuzt[i] = e.value
+
+    with ui.row().classes("w-full items-center no-wrap gap-3 px-2 py-1") \
+            .style(f"background:{hintergrund}; border-top:1px solid {LINIE}"):
+        ui.label(str(schwelle)).classes("zahl text-base").style("min-width:32px")
+        ui.label(text).classes("text-sm grow")
+        ui.checkbox(value=held.schmerz_angekreuzt[i], on_change=umschalten).props("dense")
+
+@ui.refreshable
+def _zustaende(held: Held) -> None:
+    with ui.column().classes("karte w-full gap-2"):
+        _ueberschrift("Zustände")
+        # Spalten: Name (Rest) + je 44px pro Stufe
+        with ui.grid(columns=f"1fr repeat({MAX_ZUSTANDSSTUFE}, 44px)") \
+                .classes("w-full items-center gap-y-1"):
+            # Kopfzeile
+            ui.label("Zustand").classes("text-sm").style(f"color:{NEBENTEXT}")
+            for r in ROEMISCH[:MAX_ZUSTANDSSTUFE]:
+                ui.label(r).classes("text-sm text-center").style(f"color:{NEBENTEXT}")
+            # eine Zeile pro Zustand
+            for name in ZUSTAENDE:
+                ui.label(name).classes("text-sm")
+                for stufe in range(1, MAX_ZUSTANDSSTUFE + 1):
+                    _zustand_feld(held, name, stufe)
+
+
+def _zustand_feld(held: Held, name: str, stufe: int) -> None:
+    def klicken() -> None:
+        held.zustand_klicken(name, stufe)
+        _zustaende.refresh()
+
+    with ui.element("div").classes("flex justify-center"):
+        ui.checkbox(value=held.zustaende[name] >= stufe, on_change=klicken).props("dense")
+
+def _status(held: Held) -> None:
+    with ui.column().classes("karte w-full gap-2"):
+        _ueberschrift("Status")
+        with ui.grid(columns=3).classes("w-full gap-x-4 gap-y-1"):
+            for name in STATUS:
+                ui.checkbox(name).bind_value(held.status, name).props("dense").classes("text-sm")
 
 # Build example
 def baue_heldenbogen() -> None:
@@ -158,4 +237,15 @@ def baue_heldenbogen() -> None:
         _kopfzeile(held)
         _eigenschaften(held)
         _grundwerte(held)
-        _energien(held)
+
+        with ui.row().classes("w-full gap-5 items-start no-wrap"):
+            with ui.column().style("flex:2 1 0; min-width:0"):
+                _energien(held, nach_aenderung=_schmerz.refresh)
+            with ui.column().style("flex:1 1 0; min-width:0"):
+                _schmerz(held)
+
+        with ui.row().classes("w-full gap-5 items-start no-wrap"):
+            with ui.column().style("flex:1 1 0; min-width:0"):
+                _zustaende(held)
+            with ui.column().style("flex:1 1 0; min-width:0"):
+                _status(held)
