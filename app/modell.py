@@ -131,6 +131,7 @@ class Held:
     grundwerte: dict[str, int] = field(default_factory=lambda: {k: 0 for k in GRUNDWERTE})
     energien: dict[str, Energie] = field(default_factory=lambda: {k: Energie() for k in ENERGIEN})
     kampftechniken: dict[str, int] = field(default_factory=lambda: {k: KTW_START for k in KAMPFTECHNIKEN})
+    schicksalspunkte: Energie = field(default_factory=lambda: Energie(aktuell=3, max=3))
 
     schmerz_angekreuzt: list[bool] = field(default_factory=lambda: [False] * 5)
 
@@ -189,6 +190,9 @@ class Held:
             held.energien[kurz] = Energie(**werte)
 
         held.kampftechniken.update(daten.get("kampftechniken", {}))
+
+        if "schicksalspunkte" in daten:
+            held.schicksalspunkte = Energie(**daten["schicksalspunkte"])
 
         held.schmerz_angekreuzt = list(daten.get("schmerz_angekreuzt", held.schmerz_angekreuzt))
 

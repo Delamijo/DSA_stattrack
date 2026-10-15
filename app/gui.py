@@ -200,6 +200,33 @@ def _energien(held: Held, nach_aenderung: Callable[[], None]) -> None:
         for kurz, name in ENERGIEN.items():
             _energie_karte(held.energien[kurz], name, ENERGIE_FARBEN[kurz], nach_aenderung)
 
+def _schicksalspunkte(held: Held) -> None:
+    schip = held.schicksalspunkte
+
+    def punkte(_) -> str:
+        return "●" * schip.aktuell + "○" * (schip.max - schip.aktuell)
+
+    with ui.row().classes("karte w-full items-center justify-between no-wrap"):
+        with ui.column().classes("gap-0"):
+            ui.label("Schicksalspunkte").classes("text-base font-medium")
+            ui.label().bind_text_from(schip, "aktuell", backward=punkte) \
+                .style(f"color:{AKZENT}; font-size:20px; letter-spacing:4px")
+        with ui.row().classes("zahl items-center gap-2 no-wrap"):
+            ui.button("−", on_click=lambda: schip.confirm(minus=1)) \
+                .props("flat dense color=white").classes("pm-knopf")
+            ui.label().bind_text_from(schip, "aktuell", backward=str) \
+                .classes("text-center").style("font-size:26px; min-width:28px")
+            ui.button("+", on_click=lambda: schip.confirm(plus=1)) \
+                .props("flat dense color=white").classes("pm-knopf")
+            ui.label("/").style(f"color:{NEBENTEXT}; font-size:18px")
+            ui.button("−", on_click=lambda: schip.max_change(-1)) \
+                .props("flat dense color=white").classes("pm-knopf")
+            ui.label().bind_text_from(schip, "max", backward=str) \
+                .classes("text-center").style("font-size:20px; min-width:28px")
+            ui.button("+", on_click=lambda: schip.max_change(+1)) \
+                .props("flat dense color=white").classes("pm-knopf")
+            ui.label("max").style(f"color:{NEBENTEXT}; font-size:12px")
+
 @ui.refreshable
 def _schmerz(held: Held) -> None:
     lep = held.energien["LeP"]
@@ -376,6 +403,7 @@ def baue_heldenbogen() -> None:
         with ui.row().classes("w-full gap-5 items-start no-wrap"):
             with ui.column().style("flex:2 1 0; min-width:0"):
                 _energien(held, nach_aenderung=_schmerz.refresh)
+                _schicksalspunkte(held)
             with ui.column().style("flex:1 1 0; min-width:0"):
                 _schmerz(held)
 
