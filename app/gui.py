@@ -6,6 +6,7 @@ from collections.abc import Callable
 from pathlib import Path
 from nicegui import app as nicegui_app
 from . import speicher
+from . import optolith
 
 # für laden alte und neue versionen
 try:
@@ -153,14 +154,15 @@ def _dateiname(name: str) -> str:
     return f"{sicher or 'held'}.json"
 
 # Areas
-def _kopfzeile(held: Held, beim_laden: Callable, beim_exportieren: Callable) -> None:
+def _kopfzeile(held: Held, beim_optolith: Callable, beim_laden: Callable, beim_exportieren: Callable) -> None:
+    unterzeile = " · ".join(t for t in (held.profession, held.spezies) if t)
     with ui.row().classes("w-full items-center justify-between pb-4") \
             .style(f"border-bottom:1px solid {LINIE}"):
         with ui.row().classes("items-baseline gap-4"):
             ui.label(held.name).style(f"font-size:30px; color:{AKZENT}")
-            ui.label(f"{held.profession} · {held.spezies}").style(f"color:{NEBENTEXT}")
+            ui.label(unterzeile).style(f"color:{NEBENTEXT}")
         with ui.row().classes("gap-2"):
-            ui.button("Optolith-JSON laden", on_click=lambda: ui.notify("Kommt im nächsten Schritt.")) \
+            ui.button("Optolith-JSON laden", on_click=beim_optolith) \
                 .props("outline no-caps color=white")
             ui.button("Stand laden", on_click=beim_laden) \
                 .props("outline no-caps color=white")
@@ -168,7 +170,6 @@ def _kopfzeile(held: Held, beim_laden: Callable, beim_exportieren: Callable) -> 
                 .props("unelevated no-caps text-color=black")
 
 def _ueberschrift(text: str) -> None:
-    """Goldene Bereichsüberschrift (Schmerz, Zustände, Status …)."""
     ui.label(text).classes("font-medium").style(f"font-size:20px; color:{AKZENT}")
 
 def _plus_minus(werte: dict, schluessel: str, minimum: int | None = None, schriftgroesse: str = "28px") -> None:
@@ -463,6 +464,18 @@ def baue_heldenbogen() -> None:
             return
         held_ersetzen(neuer)
         ui.notify(f"„{neuer.name}“ geladen.", type="positive")
+    
+    async def optolith_laden() -> None:
+        pfad = await _datei_oeffnen()
+        if pfad is None:
+            return
+        try:
+            neuer = optolith.laden(pfad)
+        except optolith.OptolithFehler as e:
+            ui.notify(str(e), type="negative", multi_line=True)
+            return
+        held_ersetzen(neuer)
+        ui.notify(f"„{neuer.name}“ aus Optolith importiert", type="positive")
 
     async def stand_exportieren() -> None:
         held = stand["held"]
@@ -480,7 +493,7 @@ def baue_heldenbogen() -> None:
     def bogen() -> None:
         held = stand["held"]
         with ui.column().classes("w-full max-w-[1376px] mx-auto gap-5 p-6"):
-            _kopfzeile(held, beim_laden=stand_laden, beim_exportieren=stand_exportieren)
+            _kopfzeile(held, beim_optolith=optolith_laden, beim_laden=stand_laden, beim_exportieren=stand_exportieren)
             _eigenschaften(held)
             _grundwerte(held)
 

@@ -37,12 +37,15 @@ STATUS = [
 
 KAMPFTECHNIKEN = {
     "Armbrüste":          {"leit": ("FF",),      "sf": "B", "fern": True,  "pa": False},
+    "Blasrohre":          {"leit": ("FF",),      "sf": "B", "fern": True,  "pa": False},
     "Bögen":              {"leit": ("FF",),      "sf": "C", "fern": True,  "pa": False},
+    "Diskusse":           {"leit": ("FF",),      "sf": "C", "fern": True,  "pa": False},
     "Dolche":             {"leit": ("GE",),      "sf": "B", "fern": False, "pa": True},
     "Fechtwaffen":        {"leit": ("GE",),      "sf": "C", "fern": False, "pa": True},
     "Hiebwaffen":         {"leit": ("KK",),      "sf": "C", "fern": False, "pa": True},
     "Kettenwaffen":       {"leit": ("KK",),      "sf": "C", "fern": False, "pa": False},
     "Lanzen":             {"leit": ("KK",),      "sf": "B", "fern": False, "pa": True},
+    "Peitschen":          {"leit": ("FF",),      "sf": "B", "fern": False, "pa": False},
     "Raufen":             {"leit": ("GE", "KK"), "sf": "B", "fern": False, "pa": True},
     "Schilde":            {"leit": ("KK",),      "sf": "C", "fern": False, "pa": True},
     "Schleudern":         {"leit": ("FF",),      "sf": "B", "fern": True,  "pa": False},
