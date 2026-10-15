@@ -2,9 +2,11 @@ from pathlib import Path
 from nicegui import ui
 from nicegui import app as nicegui_app
 from app.gui import baue_heldenbogen
+import sys
 
 
-nicegui_app.add_static_files("/fonts", Path(__file__).parent / "Fonts")
+BASIS = Path(getattr(sys, "_MEIPASS", Path(__file__).parent))
+nicegui_app.add_static_files("/fonts", BASIS / "Fonts")
 
 @ui.page("/")
 def index() -> None:
