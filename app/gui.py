@@ -3,7 +3,6 @@ from __future__ import annotations
 from nicegui import ui
 from .modell import Held, beispiel_held, EIGENSCHAFTEN, GRUNDWERTE
 
-# theme
 HINTERGRUND = "#14161b"
 KARTE = "#1d2027"
 LINIE = "#2c3039"
@@ -17,7 +16,11 @@ EIGENSCHAFT_FARBEN = {
 }
 
 BUTTON_HOEHE = "44px"
-RUNDUNG = "10px"
+RUNDUNG = "2px"
+RAHMEN_BREITE = "2px"
+
+SCHRIFT = "'Ubuntu', sans-serif"
+SCHRIFT_ZAHLEN = "'Ubuntu Mono', monospace"
 
 
 def _theme() -> None:
@@ -25,12 +28,24 @@ def _theme() -> None:
     ui.colors(primary=AKZENT)
     ui.query("body").style(f"background:{HINTERGRUND}; color:{TEXT}")
     ui.add_css(f"""
-        .karte {{ background:{KARTE}; border-radius:{RUNDUNG}; padding:12px 14px; }}
-        .q-btn {{ min-height:{BUTTON_HOEHE}; }}
-        .zahl  {{ font-family:'IBM Plex Mono', monospace; }}
-        .pm-knopf {{ background:#2a2e37 !important; border:1px solid #3a3f4a; border-radius:6px; min-width:40px; font-size:18px; }}
-    """)
+        /* --- Schriften aus dem Ordner fonts/ --- */
+        @font-face {{ font-family:'Ubuntu'; font-weight:400; src:url('/fonts/Ubuntu-Regular.ttf'); }}
+        @font-face {{ font-family:'Ubuntu'; font-weight:500; src:url('/fonts/Ubuntu-Medium.ttf'); }}
+        @font-face {{ font-family:'Ubuntu'; font-weight:700; src:url('/fonts/Ubuntu-Bold.ttf'); }}
+        @font-face {{ font-family:'Ubuntu Mono'; src:url('/fonts/UbuntuMono-Regular.ttf'); }}
 
+        body  {{ font-family:{SCHRIFT}; }}
+        .zahl {{ font-family:{SCHRIFT_ZAHLEN}; }}
+
+        /* --- Kästen --- */
+        .karte {{ background:{KARTE}; border:1px solid {LINIE};
+                  border-radius:{RUNDUNG}; padding:12px 14px; }}
+
+        /* --- Buttons --- */
+        .q-btn {{ min-height:{BUTTON_HOEHE}; border-radius:{RUNDUNG} !important; }}
+        .pm-knopf {{ background:#2a2e37 !important; border:1px solid #3a3f4a;
+                     min-width:40px; font-size:18px; }}
+    """)
 
 # Areas
 def _kopfzeile(held: Held) -> None:
@@ -64,7 +79,7 @@ def _eigenschaften(held: Held) -> None:
     with ui.grid(columns=8).classes("w-full gap-3"):
         for kurz in EIGENSCHAFTEN:
             farbe = EIGENSCHAFT_FARBEN[kurz]
-            with ui.column().classes("karte items-center gap-2").style(f"border-top:3px solid {farbe}"):
+            with ui.column().classes("karte items-center gap-2").style(f"border:{RAHMEN_BREITE} solid {farbe}"):
                 ui.label(kurz).classes("text-sm font-semibold tracking-widest").style("color:#c9c6bf")
                 _plus_minus(held.eigenschaften, kurz, minimum=0)
 
