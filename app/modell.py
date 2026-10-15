@@ -35,6 +35,29 @@ STATUS = [
     "Unsichtbar", "Vergiftet", "Versteinert",
 ]
 
+KAMPFTECHNIKEN = {
+    "Armbrüste":          {"leit": ("FF",),      "sf": "B", "fern": True,  "pa": False},
+    "Bögen":              {"leit": ("FF",),      "sf": "C", "fern": True,  "pa": False},
+    "Dolche":             {"leit": ("GE",),      "sf": "B", "fern": False, "pa": True},
+    "Fechtwaffen":        {"leit": ("GE",),      "sf": "C", "fern": False, "pa": True},
+    "Hiebwaffen":         {"leit": ("KK",),      "sf": "C", "fern": False, "pa": True},
+    "Kettenwaffen":       {"leit": ("KK",),      "sf": "C", "fern": False, "pa": False},
+    "Lanzen":             {"leit": ("KK",),      "sf": "B", "fern": False, "pa": True},
+    "Raufen":             {"leit": ("GE", "KK"), "sf": "B", "fern": False, "pa": True},
+    "Schilde":            {"leit": ("KK",),      "sf": "C", "fern": False, "pa": True},
+    "Schleudern":         {"leit": ("FF",),      "sf": "B", "fern": True,  "pa": False},
+    "Schwerter":          {"leit": ("GE", "KK"), "sf": "C", "fern": False, "pa": True},
+    "Stangenwaffen":      {"leit": ("GE", "KK"), "sf": "C", "fern": False, "pa": True},
+    "Wurfwaffen":         {"leit": ("FF",),      "sf": "B", "fern": True,  "pa": False},
+    "Zweihandhiebwaffen": {"leit": ("KK",),      "sf": "C", "fern": False, "pa": True},
+    "Zweihandschwerter":  {"leit": ("KK",),      "sf": "C", "fern": False, "pa": True},
+}
+
+KTW_START = 6
+
+def bonus(wert: int) -> int:
+    """+1 für 3 volle Punkte über 8 für AT, FK, PA"""
+    return max(0, (wert - 8) // 3)
 
 def rund(x: float) -> int:
     """nicht nativ runden (.5 zu 1)."""
@@ -92,6 +115,10 @@ class Ruestung:
     be: int = 0
     angelegt: bool = False
 
+@dataclass
+class Eintrag:
+    name: str = ""
+    beschreibung: str = ""
 
 # Held
 @dataclass
@@ -103,12 +130,16 @@ class Held:
     eigenschaften: dict[str, int] = field(default_factory=lambda: {k: 8 for k in EIGENSCHAFTEN})
     grundwerte: dict[str, int] = field(default_factory=lambda: {k: 0 for k in GRUNDWERTE})
     energien: dict[str, Energie] = field(default_factory=lambda: {k: Energie() for k in ENERGIEN})
+    kampftechniken: dict[str, int] = field(default_factory=lambda: {k: KTW_START for k in KAMPFTECHNIKEN})
 
     schmerz_angekreuzt: list[bool] = field(default_factory=lambda: [False] * 5)
 
     nahkampf: list[Nahkampfwaffe] = field(default_factory=list)
     fernkampf: list[Fernkampfwaffe] = field(default_factory=list)
     ruestung: list[Ruestung] = field(default_factory=list)
+
+    sonderfertigkeiten: list[Eintrag] = field(default_factory=list)
+    zauber: list[Eintrag] = field(default_factory=list)
 
     zustaende: dict[str, int] = field(default_factory=lambda: {z: 0 for z in ZUSTAENDE})
     status: dict[str, bool] = field(default_factory=lambda: {s: False for s in STATUS})
@@ -123,6 +154,21 @@ class Held:
         """Klick auf Stufe n setzt n"""
         aktuell = self.zustaende.get(name, 0)
         self.zustaende[name] = stufe - 1 if aktuell == stufe else stufe
+
+    def kt_angriff(self, name: str) -> int:
+        """AT Nahkampf MU bzw FK Fernkampf FF ohne mod"""
+        ktw = self.kampftechniken[name]
+        eigenschaft = "FF" if KAMPFTECHNIKEN[name]["fern"] else "MU"
+        return ktw + bonus(self.eigenschaften[eigenschaft])
+
+    def kt_parade(self, name: str) -> int | None:
+        """PA mod; None wenn Kt keine PA hat"""
+        info = KAMPFTECHNIKEN[name]
+        if not info["pa"]:
+            return None
+        ktw = self.kampftechniken[name]
+        leit = max(self.eigenschaften[e] for e in info["leit"])
+        return (ktw + 1) // 2 + bonus(leit)
 
     # für json
     def to_dict(self) -> dict:
@@ -142,11 +188,16 @@ class Held:
         for kurz, werte in daten.get("energien", {}).items():
             held.energien[kurz] = Energie(**werte)
 
+        held.kampftechniken.update(daten.get("kampftechniken", {}))
+
         held.schmerz_angekreuzt = list(daten.get("schmerz_angekreuzt", held.schmerz_angekreuzt))
 
         held.nahkampf = [Nahkampfwaffe(**w) for w in daten.get("nahkampf", [])]
         held.fernkampf = [Fernkampfwaffe(**w) for w in daten.get("fernkampf", [])]
         held.ruestung = [Ruestung(**r) for r in daten.get("ruestung", [])]
+
+        held.sonderfertigkeiten = [Eintrag(**e) for e in daten.get("sonderfertigkeiten", [])]
+        held.zauber = [Eintrag(**e) for e in daten.get("zauber", [])]
 
         held.zustaende.update(daten.get("zustaende", {}))
         held.status.update(daten.get("status", {}))
@@ -158,6 +209,7 @@ def beispiel_held() -> Held:
     held = Held(name="Hadruf der eisernen Hand", profession="Schaukämpfer", spezies="Mensch")
     held.eigenschaften.update({"MU": 15, "KL": 8, "IN": 13, "CH": 10, "FF": 10, "GE": 15, "KO": 16, "KK": 15})
     held.grundwerte.update({"SK": 1, "ZK": 3, "AW": 8, "INI": 15, "GS": 8, "WS": 9})
+    held.kampftechniken.update({"Raufen": 15, "Schleudern": 12})
     held.energien["LeP"] = Energie(aktuell=40, max=40)
     held.nahkampf = [
         Nahkampfwaffe("Schlagring", "Raufen", "1W6+1", 17, 10, "kurz", True),
@@ -166,4 +218,11 @@ def beispiel_held() -> Held:
     ]
     held.fernkampf = [Fernkampfwaffe("Wurfkeule", "Wurfwaffen", "1W6+2", 6, "2/10/15", "1 Akt.", True)]
     held.ruestung = [Ruestung("Kettenhemd", 4, 2, True)]
+    held.sonderfertigkeiten = [
+        Eintrag("Finte", "Angriff mit Erschwernis, Gegner PA wird um selben Wert erschwert"),
+        Eintrag("Wuchtschlag I", "AT -2, +2 TP."),
+    ]
+    held.zauber = [
+        Eintrag("Feuerball", "AOE, der 1W6+3 Schaden verursacht."),
+    ]
     return held

@@ -1,7 +1,7 @@
 """gui"""
 from __future__ import annotations
 from nicegui import ui
-from .modell import Held, beispiel_held, EIGENSCHAFTEN, GRUNDWERTE, Energie, ENERGIEN, ZUSTAENDE, STATUS, MAX_ZUSTANDSSTUFE
+from .modell import Held, beispiel_held, EIGENSCHAFTEN, GRUNDWERTE, Energie, ENERGIEN, ZUSTAENDE, STATUS, MAX_ZUSTANDSSTUFE, Fernkampfwaffe, Nahkampfwaffe, Ruestung, KAMPFTECHNIKEN, Eintrag
 from collections.abc import Callable
 
 HINTERGRUND = "#14161b"
@@ -73,6 +73,35 @@ SCHMERZ_TEXTE = [
     "0 oder weniger · im Sterben",
 ]
 ROEMISCH = ["I", "II", "III", "IV"]
+
+NAHKAMPF_SPALTEN = [
+    ("Waffe", "name", "text", "2fr"),
+    ("Kampftechnik", "kampftechnik", "text", "1.5fr"),
+    ("TP", "tp", "text", "100px"),
+    ("AT", "at", "zahl", "70px"),
+    ("PA", "pa", "zahl", "70px"),
+    ("Reichweite", "reichweite", "text", "120px"),
+]
+FERNKAMPF_SPALTEN = [
+    ("Waffe", "name", "text", "2fr"),
+    ("Kampftechnik", "kampftechnik", "text", "1.5fr"),
+    ("TP", "tp", "text", "100px"),
+    ("FK", "fk", "zahl", "70px"),
+    ("Reichweite", "reichweite", "text", "120px"),
+    ("Ladezeit", "ladezeit", "text", "110px"),
+]
+RUESTUNG_SPALTEN = [
+    ("Rüstung", "name", "text", "1fr"),
+    ("RS", "rs", "zahl", "80px"),
+    ("BE", "be", "zahl", "80px"),
+]
+
+EINTRAG_SPALTEN = [
+    ("Name", "name", "text", "240px"),
+    ("Beschreibung", "beschreibung", "langtext", "1fr"),
+]
+
+KT_RASTER = "1fr 64px 36px auto 56px 56px"
 
 # Areas
 def _kopfzeile(held: Held) -> None:
@@ -200,14 +229,12 @@ def _schmerz_zeile(held: Held, i: int, schwelle: int, text: str, erreicht: bool)
 def _zustaende(held: Held) -> None:
     with ui.column().classes("karte w-full gap-2"):
         _ueberschrift("Zustände")
-        # Spalten: Name (Rest) + je 44px pro Stufe
         with ui.grid(columns=f"1fr repeat({MAX_ZUSTANDSSTUFE}, 44px)") \
                 .classes("w-full items-center gap-y-1"):
             # Kopfzeile
             ui.label("Zustand").classes("text-sm").style(f"color:{NEBENTEXT}")
             for r in ROEMISCH[:MAX_ZUSTANDSSTUFE]:
                 ui.label(r).classes("text-sm text-center").style(f"color:{NEBENTEXT}")
-            # eine Zeile pro Zustand
             for name in ZUSTAENDE:
                 ui.label(name).classes("text-sm")
                 for stufe in range(1, MAX_ZUSTANDSSTUFE + 1):
@@ -229,6 +256,114 @@ def _status(held: Held) -> None:
             for name in STATUS:
                 ui.checkbox(name).bind_value(held.status, name).props("dense").classes("text-sm")
 
+def _kampftechniken(held: Held) -> None:
+    namen = list(KAMPFTECHNIKEN)
+    haelfte = (len(namen) + 1) // 2
+
+    with ui.column().classes("karte w-full gap-2"):
+        _ueberschrift("Kampftechniken")
+        ui.label("AT/FK und PA ohne Waffenmodifikator, berechnet aus KtW und Eigenschaften.") \
+            .classes("text-xs pb-1").style(f"color:{NEBENTEXT}")
+        with ui.grid(columns=2).classes("w-full gap-x-10"):
+            _kt_tabelle(held, namen[:haelfte])
+            _kt_tabelle(held, namen[haelfte:])
+
+
+def _kt_tabelle(held: Held, namen: list[str]) -> None:
+    with ui.grid(columns=KT_RASTER).classes("w-full items-center gap-x-3 gap-y-1 content-start"):
+        for titel in ["Kampftechnik", "Leiteig.", "Sf.", "KtW", "AT/FK", "PA"]:
+            ui.label(titel).classes("text-sm text-center first:text-left").style(f"color:{NEBENTEXT}")
+        for name in namen:
+            _kt_zeile(held, name)
+
+
+def _kt_zeile(held: Held, name: str) -> None:
+    info = KAMPFTECHNIKEN[name]
+
+    ui.label(name).classes("text-sm")
+    ui.label("/".join(info["leit"])).classes("zahl text-sm text-center").style(f"color:{NEBENTEXT}")
+    ui.label(info["sf"]).classes("text-sm text-center").style(f"color:{NEBENTEXT}")
+    _plus_minus(held.kampftechniken, name, minimum=0, schriftgroesse="18px")
+    ui.label().bind_text_from(held.kampftechniken, name,
+                              backward=lambda _: str(held.kt_angriff(name))) \
+        .classes("zahl text-lg text-center")
+    ui.label().bind_text_from(held.kampftechniken, name,
+                              backward=lambda _: _strich(held.kt_parade(name))) \
+        .classes("zahl text-lg text-center")
+
+
+def _strich(wert: int | None) -> str:
+    """None als stich"""
+    return "–" if wert is None else str(wert)
+
+def _tabelle(titel: str, zeilen: list, spalten: list, neue_zeile: Callable, mit_angelegt: bool = True) -> None:
+
+    raster = "40px " + " ".join(breite for _, _, _, breite in spalten)
+    if mit_angelegt:
+        raster += " 90px"
+
+    def hinzufuegen() -> None:
+        zeilen.append(neue_zeile())
+        inhalt.refresh()
+
+    def entfernen(zeile) -> None:
+        zeilen[:] = [z for z in zeilen if z is not zeile]
+        inhalt.refresh()
+
+    @ui.refreshable
+    def inhalt() -> None:
+        if not zeilen:
+            ui.label("Keine").classes("text-sm").style(f"color:{NEBENTEXT}")
+            return
+        with ui.grid(columns=raster).classes("w-full items-start gap-2"):
+            ui.label("")
+            for ueberschrift, _, _, _ in spalten:
+                ui.label(ueberschrift).classes("text-sm").style(f"color:{NEBENTEXT}")
+            if mit_angelegt:
+                ui.label("Angelegt").classes("text-sm text-center").style(f"color:{NEBENTEXT}")
+            for zeile in zeilen:
+                _tabellen_zeile(zeile, spalten, entfernen, mit_angelegt)
+
+    with ui.column().classes("karte w-full gap-2"):
+        with ui.row().classes("w-full items-center justify-between"):
+            ui.label(titel).classes("text-base font-medium")
+            ui.button("+ Zeile", on_click=hinzufuegen).props("outline no-caps dense color=grey-5")
+        inhalt()
+
+
+def _tabellen_zeile(zeile, spalten: list, entfernen: Callable, mit_angelegt: bool) -> None:
+    ui.button("✕", on_click=lambda: entfernen(zeile)) \
+        .props("flat dense color=grey-6").classes("pm-knopf")
+
+    for _, feld, art, _ in spalten:
+        if art == "zahl":
+            ui.number(format="%d") \
+                .bind_value(zeile, feld, forward=lambda v: int(v or 0)) \
+                .props("outlined dense dark").classes("w-full zahl")
+        elif art == "langtext":
+            ui.textarea().bind_value(zeile, feld) \
+                .props("outlined dense dark autogrow").classes("w-full")
+        else:
+            ui.input().bind_value(zeile, feld) \
+                .props("outlined dense dark").classes("w-full")
+
+    if mit_angelegt:
+        with ui.element("div").classes("flex justify-center items-center h-10"):
+            ui.checkbox().bind_value(zeile, "angelegt").props("dense")
+
+def _ausruestung(held: Held) -> None:
+    with ui.column().classes("w-full gap-3"):
+        _ueberschrift("Ausrüstung")
+        _tabelle("Nahkampfwaffen", held.nahkampf, NAHKAMPF_SPALTEN, Nahkampfwaffe)
+        _tabelle("Fernkampfwaffen", held.fernkampf, FERNKAMPF_SPALTEN, Fernkampfwaffe)
+        _tabelle("Rüstung", held.ruestung, RUESTUNG_SPALTEN, Ruestung)
+
+def _notizen(held: Held) -> None:
+    with ui.column().classes("w-full gap-3"):
+        _tabelle("Sonderfertigkeiten & Kampffertigkeiten", held.sonderfertigkeiten,
+                 EINTRAG_SPALTEN, Eintrag, mit_angelegt=False)
+        _tabelle("Zauber", held.zauber, EINTRAG_SPALTEN, Eintrag, mit_angelegt=False)
+
 # Build example
 def baue_heldenbogen() -> None:
     held = beispiel_held()
@@ -243,6 +378,12 @@ def baue_heldenbogen() -> None:
                 _energien(held, nach_aenderung=_schmerz.refresh)
             with ui.column().style("flex:1 1 0; min-width:0"):
                 _schmerz(held)
+
+        _ausruestung(held)
+
+        _kampftechniken(held)
+
+        _notizen(held)
 
         with ui.row().classes("w-full gap-5 items-start no-wrap"):
             with ui.column().style("flex:1 1 0; min-width:0"):
