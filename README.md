@@ -1,5 +1,5 @@
 # DSA_stattrack
-Stattrack App für Das Schwarze Auge
+Stattrack App für DSA
 
 
 Privates Projekt um Combat in DSA übersichtlicher zu gestalten.
