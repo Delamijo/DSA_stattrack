@@ -18,12 +18,130 @@ except ImportError:
 
 DATEITYPEN = ("JSON Dateien (*.json)", "Alle Dateien (*.*)")
 
-HINTERGRUND = "#14161b"
-KARTE = "#1d2027"
-LINIE = "#2c3039"
-TEXT = "#ebe8e1"
-NEBENTEXT = "#a9adb6"
-AKZENT = "#e8b04a"
+# Paletten
+PALETTEN = {
+    "Nacht & Gold": {
+        "hintergrund": "#14161b", 
+        "karte": "#1d2027", 
+        "linie": "#2c3039",
+        "text": "#ebe8e1", 
+        "nebentext": "#a9adb6", 
+        "akzent": "#e8b04a",
+        "knopf": "#2a2e37", 
+        "knopf-rand": "#3a3f4a", 
+        "markierung": "#3b2a12",
+    },
+    "Olive & Kupfer": {
+        "hintergrund": "#1a2310", 
+        "karte": "#283618", 
+        "linie": "#3d4f26",
+        "text": "#FEFAE0", 
+        "nebentext": "#bdbb9c", 
+        "akzent": "#DDA15E",
+        "knopf": "#33441f", 
+        "knopf-rand": "#606C38", 
+        "markierung": "#4a2c10",
+    },
+    "Türkis & Violett": {
+        "hintergrund": "#16121f", 
+        "karte": "#211a2e", 
+        "linie": "#3a2f4f",
+        "text": "#DDDDDD", 
+        "nebentext": "#9fc9b8", 
+        "akzent": "#55D6BE",
+        "knopf": "#2c2340", 
+        "knopf-rand": "#7D5BA6", 
+        "markierung": "#4a1e24",
+    },
+    "Pflaume & Orchidee": {
+        "hintergrund": "#1a0217", 
+        "karte": "#2a0525", 
+        "linie": "#420039",
+        "text": "#F6F2FF", 
+        "nebentext": "#b9a8d4", 
+        "akzent": "#E07BE0",
+        "knopf": "#420039", 
+        "knopf-rand": "#932F6D", 
+        "markierung": "#5a1a45",
+    },
+    "Moos & Limette": {
+        "hintergrund": "#1b1610", 
+        "karte": "#2a2118", 
+        "linie": "#4a3a28",
+        "text": "#E6F8B2", 
+        "nebentext": "#a9b08c", 
+        "akzent": "#CDE77F",
+        "knopf": "#3a2e20", 
+        "knopf-rand": "#709176", 
+        "markierung": "#4a3520",
+    },
+    "Ebenholz & Rose": {
+        "hintergrund": "#1a0500", 
+        "karte": "#2A0800", 
+        "linie": "#4a2418",
+        "text": "#F4DBD8", 
+        "nebentext": "#BEA8A7", 
+        "akzent": "#C09891",
+        "knopf": "#3a1608", 
+        "knopf-rand": "#775144", 
+        "markierung": "#5a2a1a",
+    },
+    "Papyrus": {
+        "hintergrund": "#1c150e", 
+        "karte": "#2a2017", 
+        "linie": "#4a3b2a",
+        "text": "#F7F1E1", 
+        "nebentext": "#C9B18A", 
+        "akzent": "#E6D6B8",
+        "knopf": "#3a2e21", 
+        "knopf-rand": "#5B4A36", 
+        "markierung": "#4a3820",
+    },
+}
+STANDARD_PALETTE = "Papyrus"
+
+# Konstanten
+HINTERGRUND = "var(--hintergrund)"
+KARTE = "var(--karte)"
+LINIE = "var(--linie)"
+TEXT = "var(--text)"
+NEBENTEXT = "var(--nebentext)"
+AKZENT = "var(--akzent)"
+SCHMERZ_MARKIERUNG = "var(--markierung)"
+
+
+def _palette_klasse(name: str) -> str:
+    """Paletten-Name → CSS-Klasse (Namen mit Leerzeichen/& gehen nicht als Klasse)."""
+    return f"palette-{list(PALETTEN).index(name)}"
+
+
+def _paletten_css() -> str:
+    """Erzeugt für jede Palette eine Klasse, die alle Variablen setzt."""
+    bloecke = []
+    for name, farben in PALETTEN.items():
+        variablen = " ".join(f"--{k}:{v};" for k, v in farben.items())
+        bloecke.append(f"body.{_palette_klasse(name)} {{ {variablen} --q-primary:{farben['akzent']}; }}")
+    return "\n".join(bloecke)
+
+def _palette_wechseln(name: str) -> None:
+    """Paletten entfernen, gewählte einfügen"""
+    body = ui.query("body")
+    body.classes(remove=" ".join(_palette_klasse(n) for n in PALETTEN))
+    body.classes(add=_palette_klasse(name))
+
+def _paletten_knopf() -> None:
+    with ui.button("Farbschema").props("outline no-caps color=white"):
+        with ui.menu().props("dark").style(f"background:{KARTE}; border:1px solid {LINIE}"):
+            for name in PALETTEN:
+                _paletten_eintrag(name)
+
+
+def _paletten_eintrag(name: str) -> None:
+    akzent = PALETTEN[name]["akzent"]
+    with ui.menu_item(on_click=lambda: _palette_wechseln(name)):
+        with ui.row().classes("items-center gap-3 no-wrap"):
+            ui.element("div").style(f"width:14px; height:14px; background:{akzent}")
+            ui.label(name)
 
 EIGENSCHAFT_FARBEN = {
     "MU": "#c0392b", 
@@ -42,7 +160,7 @@ ENERGIE_FARBEN = {
     "KaP": "#d1a85a"
 }
 
-SCHMERZ_MARKIERUNG = "#3b2a12"
+SCHMERZ_MARKIERUNG = "var(--markierung)"
 
 BUTTON_HOEHE = "44px"
 RUNDUNG = "2px"
@@ -54,9 +172,11 @@ SCHRIFT_ZAHLEN = "'Ubuntu Mono', monospace"
 
 def _theme() -> None:
     """Theme und CSS overall"""
-    ui.colors(primary=AKZENT)
-    ui.query("body").style(f"background:{HINTERGRUND}; color:{TEXT}")
-    ui.add_css(f"""
+    ui.query("body") \
+        .style(f"background:{HINTERGRUND}; color:{TEXT}") \
+        .classes(_palette_klasse(STANDARD_PALETTE))
+
+    ui.add_css(_paletten_css() + f"""
         /* --- Schriften aus dem Ordner fonts/ --- */
         @font-face {{ font-family:'Ubuntu'; font-weight:400; src:url('/fonts/Ubuntu-Regular.ttf'); }}
         @font-face {{ font-family:'Ubuntu'; font-weight:500; src:url('/fonts/Ubuntu-Medium.ttf'); }}
@@ -72,7 +192,7 @@ def _theme() -> None:
 
         /* --- Buttons --- */
         .q-btn {{ min-height:{BUTTON_HOEHE}; border-radius:{RUNDUNG} !important; }}
-        .pm-knopf {{ background:#2a2e37 !important; border:1px solid #3a3f4a;
+        .pm-knopf {{ background:var(--knopf) !important; border:1px solid var(--knopf-rand);
                      min-width:40px; font-size:18px; }}
 
         /* --- Eingabefelder --- */
@@ -162,6 +282,7 @@ def _kopfzeile(held: Held, beim_optolith: Callable, beim_laden: Callable, beim_e
             ui.label(held.name).style(f"font-size:30px; color:{AKZENT}")
             ui.label(unterzeile).style(f"color:{NEBENTEXT}")
         with ui.row().classes("gap-2"):
+            _paletten_knopf()
             ui.button("Optolith-JSON laden", on_click=beim_optolith) \
                 .props("outline no-caps color=white")
             ui.button("Stand laden", on_click=beim_laden) \

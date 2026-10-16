@@ -1,0 +1,4 @@
+nicegui==3.18.0
+pywebview==6.2.1
+pywebview[qt]==6.2.1; sys_platform == "linux"
+pyinstaller

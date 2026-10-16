@@ -213,23 +213,23 @@ class Held:
 
 # bsp
 def beispiel_held() -> Held:
-    held = Held(name="Hadruf der eisernen Hand", profession="Schaukämpfer", spezies="Mensch")
-    held.eigenschaften.update({"MU": 15, "KL": 8, "IN": 13, "CH": 10, "FF": 10, "GE": 15, "KO": 16, "KK": 15})
-    held.grundwerte.update({"SK": 1, "ZK": 3, "AW": 8, "INI": 15, "GS": 8, "WS": 9})
-    held.kampftechniken.update({"Raufen": 15, "Schleudern": 12})
+    held = Held(name="Banger Name", profession="Profession", spezies="Spezies")
+    held.eigenschaften.update({"MU": 10, "KL": 10, "IN": 10, "CH": 10, "FF": 10, "GE": 10, "KO": 10, "KK": 10})
+    held.grundwerte.update({"SK": 4, "ZK": 4, "AW": 8, "INI": 10, "GS": 8, "WS": 4})
+    held.kampftechniken.update({"Raufen": 10, "Schleudern": 10})
     held.energien["LeP"] = Energie(aktuell=40, max=40)
     held.nahkampf = [
-        Nahkampfwaffe("Schlagring", "Raufen", "1W6+1", 17, 10, "kurz", True),
-        Nahkampfwaffe("Schmiedehammer", "Hiebwaffen", "1W6+4", 8, 2, "mittel"),
-        Nahkampfwaffe("Fackel", "Hiebwaffen", "1W6+1", 7, 3, "mittel"),
+        Nahkampfwaffe("Waffe", "Kampftalent", "xWx+x", 10, 10, "reichweite", True),
+        Nahkampfwaffe("Schwängel", "Hiebwaffen", "1W6+4", 8, 2, "mittel"),
     ]
-    held.fernkampf = [Fernkampfwaffe("Wurfkeule", "Wurfwaffen", "1W6+2", 6, "2/10/15", "1 Akt.", True)]
-    held.ruestung = [Ruestung("Kettenhemd", 4, 2, True)]
+    held.fernkampf = [Fernkampfwaffe("Fernkampfwaffe", "Kampftalent", "xWx+x", 6, "Reichweite", "Reload", True)]
+    held.ruestung = [Ruestung("Rüstung", 5, 2, True)]
     held.sonderfertigkeiten = [
-        Eintrag("Finte", "Angriff mit Erschwernis, Gegner PA wird um selben Wert erschwert"),
+        Eintrag("Fähigkeit", "Beschreibung"),
         Eintrag("Wuchtschlag I", "AT -2, +2 TP."),
     ]
     held.zauber = [
+        Eintrag("Zauber", "Beschreibung"),
         Eintrag("Feuerball", "AOE, der 1W6+3 Schaden verursacht."),
     ]
     return held

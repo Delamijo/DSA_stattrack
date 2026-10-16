@@ -1,0 +1,30 @@
+name: Windows-Exe bauen
+
+on:
+  workflow_dispatch:
+  push:
+    tags: ["v*"]
+
+jobs:
+  build:
+    runs-on: windows-latest
+    steps:
+      - name: Repo auschecken
+        uses: actions/checkout@v4
+
+      - name: Python einrichten
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.13"
+
+      - name: Pakete installieren
+        run: pip install -r requirements.txt
+
+      - name: Exe bauen
+        run: nicegui-pack --onefile --windowed --name "Heldenbogen" --add-data "Fonts;Fonts" main.py
+
+      - name: Exe hochladen
+        uses: actions/upload-artifact@v4
+        with:
+          name: Heldenbogen-Windows
+          path: dist/Heldenbogen.exe
